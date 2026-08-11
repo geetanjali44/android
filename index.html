@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <title>Save User</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      background: #f5f5f5;
+
+      display: flex;
+      justify-content: center;
+      align-items: center;
+
+      padding: 20px;
+    }
+
+    .box {
+      width: 100%;
+      max-width: 380px;
+
+      background: white;
+
+      border-radius: 18px;
+
+      padding: 28px;
+
+      box-shadow:
+        0 8px 30px rgba(0,0,0,0.08);
+    }
+
+    .device-status {
+      width: 100%;
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      gap: 8px;
+
+      padding: 10px 14px;
+
+      margin-bottom: 22px;
+
+      border-radius: 10px;
+
+      background: #f3f3f3;
+
+      font-size: 13px;
+      font-weight: 600;
+
+      color: #777;
+    }
+
+    .status-dot {
+      width: 9px;
+      height: 9px;
+
+      border-radius: 50%;
+
+      background: #999;
+    }
+
+    .device-status.connected {
+      background: #ecfdf3;
+      color: #15803d;
+    }
+
+    .device-status.connected .status-dot {
+      background: #22c55e;
+    }
+
+    .device-status.disconnected {
+      color: #777;
+      background: #f5f5f5;
+    }
+
+    .device-status.disconnected .status-dot {
+      background: #999;
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .input-group {
+      margin-bottom: 18px;
+    }
+
+    label {
+      display: block;
+
+      margin-bottom: 7px;
+
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    input {
+      width: 100%;
+      height: 48px;
+
+      border: 1px solid #ddd;
+
+      border-radius: 10px;
+
+      padding: 0 14px;
+
+      font-size: 16px;
+
+      outline: none;
+    }
+
+    input:focus {
+      border-color: #111;
+    }
+
+    button {
+      width: 100%;
+      height: 48px;
+
+      border: none;
+
+      border-radius: 10px;
+
+      background: #111;
+
+      color: white;
+
+      font-size: 16px;
+      font-weight: 600;
+
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    #message {
+      margin-top: 15px;
+
+      text-align: center;
+
+      font-size: 14px;
+
+      min-height: 20px;
+    }
+
+    .android-box {
+      margin-top: 20px;
+
+      padding: 15px;
+
+      background: #f6f6f6;
+
+      border-radius: 10px;
+
+      display: none;
+    }
+
+    .android-box h4 {
+      margin-bottom: 10px;
+    }
+
+    .android-row {
+      font-size: 13px;
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+
+    .token-text {
+      font-size: 11px;
+
+      margin-top: 6px;
+
+      color: #666;
+
+      word-break: break-all;
+    }
+
+  </style>
+</head>
+
+<body>
+
+  <div class="box">
+
+    <!-- DEVICE STATUS -->
+
+    <div
+      id="deviceStatus"
+      class="device-status"
+    >
+
+      <span class="status-dot"></span>
+
+      <span id="deviceStatusText">
+        Checking device...
+      </span>
+
+    </div>
+
+
+    <h2>Create User</h2>
+
+
+    <!-- NAME -->
+
+    <div class="input-group">
+
+      <label>Name</label>
+
+      <input
+        type="text"
+        id="name"
+        placeholder="Enter name"
+      >
+
+    </div>
+
+
+    <!-- PASSWORD -->
+
+    <div class="input-group">
+
+      <label>Password</label>
+
+      <input
+        type="password"
+        id="password"
+        placeholder="Enter password"
+      >
+
+    </div>
+
+
+    <!-- SAVE -->
+
+    <button
+      id="saveBtn"
+      onclick="saveUser()"
+    >
+      Save
+    </button>
+
+
+    <div id="message"></div>
+
+
+    <!-- DEVICE INFO -->
+
+    <div
+      class="android-box"
+      id="androidBox"
+    >
+
+      <h4>Android Device</h4>
+
+      <div class="android-row">
+
+        <strong>Status:</strong>
+
+        <span id="androidStatus">
+          Connected
+        </span>
+
+      </div>
+
+
+      <div class="android-row">
+
+        <strong>Device Token:</strong>
+
+        <div
+          id="deviceTokenText"
+          class="token-text"
+        >
+          Waiting for token...
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <script>
+
+    /* =================================
+       SUPABASE
+    ================================= */
+
+    const SUPABASE_URL =
+      "https://YOUR_PROJECT_ID.supabase.co";
+
+    const SUPABASE_KEY =
+      "YOUR_PUBLISHABLE_OR_ANON_KEY";
+
+
+    const supabaseClient =
+      supabase.createClient(
+        SUPABASE_URL,
+        SUPABASE_KEY
+      );
+
+
+    /* =================================
+       TOKEN
+    ================================= */
+
+    let androidDeviceToken = "";
+
+
+    /* =================================
+       CONNECTED
+    ================================= */
+
+    function showDeviceConnected() {
+
+      const box =
+        document.getElementById(
+          "deviceStatus"
+        );
+
+      const text =
+        document.getElementById(
+          "deviceStatusText"
+        );
+
+      box.classList.remove(
+        "disconnected"
+      );
+
+      box.classList.add(
+        "connected"
+      );
+
+      text.innerText =
+        "Device Connected";
+    }
+
+
+    /* =================================
+       DISCONNECTED
+    ================================= */
+
+    function showDeviceDisconnected() {
+
+      const box =
+        document.getElementById(
+          "deviceStatus"
+        );
+
+      const text =
+        document.getElementById(
+          "deviceStatusText"
+        );
+
+      box.classList.remove(
+        "connected"
+      );
+
+      box.classList.add(
+        "disconnected"
+      );
+
+      text.innerText =
+        "Device Not Connected";
+    }
+
+
+    /* =================================
+       CHECK ANDROID
+    ================================= */
+
+    function checkAndroidDevice() {
+
+      if (
+        window.Android &&
+        typeof window.Android.deviceReady
+        === "function"
+      ) {
+
+        showDeviceConnected();
+
+        try {
+
+          window.Android.deviceReady();
+
+        } catch (error) {
+
+          console.log(
+            "deviceReady error:",
+            error
+          );
+
+        }
+
+      } else {
+
+        showDeviceDisconnected();
+
+      }
+    }
+
+
+    /* =================================
+       RECEIVE TOKEN FROM ANDROID
+    ================================= */
+
+    window.receiveAndroidDeviceToken =
+      function(token) {
+
+        if (!token) {
+          return;
+        }
+
+        androidDeviceToken =
+          String(token);
+
+        showDeviceConnected();
+
+
+        document.getElementById(
+          "androidBox"
+        ).style.display =
+          "block";
+
+
+        document.getElementById(
+          "deviceTokenText"
+        ).innerText =
+          androidDeviceToken;
+
+
+        document.getElementById(
+          "androidStatus"
+        ).innerText =
+          "Connected";
+
+
+        console.log(
+          "Android token:",
+          androidDeviceToken
+        );
+
+      };
+
+
+    window.androidDeviceConnected =
+      function() {
+
+        showDeviceConnected();
+
+      };
+
+
+    /* =================================
+       SAVE TO SUPABASE
+    ================================= */
+
+    async function saveUser() {
+
+      const name =
+        document
+          .getElementById("name")
+          .value
+          .trim();
+
+      const password =
+        document
+          .getElementById("password")
+          .value
+          .trim();
+
+      const message =
+        document.getElementById(
+          "message"
+        );
+
+      const button =
+        document.getElementById(
+          "saveBtn"
+        );
+
+
+      if (!name) {
+
+        message.style.color =
+          "red";
+
+        message.innerText =
+          "Please enter name";
+
+        return;
+      }
+
+
+      if (!password) {
+
+        message.style.color =
+          "red";
+
+        message.innerText =
+          "Please enter password";
+
+        return;
+      }
+
+
+      if (!androidDeviceToken) {
+
+        message.style.color =
+          "red";
+
+        message.innerText =
+          "Waiting for device token";
+
+        return;
+      }
+
+
+      button.disabled =
+        true;
+
+      button.innerText =
+        "Saving...";
+
+
+      message.style.color =
+        "#666";
+
+      message.innerText =
+        "Saving...";
+
+
+      try {
+
+        const { error } =
+          await supabaseClient
+            .from("device_users")
+            .insert({
+              name: name,
+              password: password,
+              device_token:
+                androidDeviceToken
+            });
+
+
+        if (error) {
+
+          throw error;
+
+        }
+
+
+        /* SUCCESS */
+
+        message.style.color =
+          "green";
+
+        message.innerText =
+          "Saved successfully";
+
+
+        document.getElementById(
+          "name"
+        ).value = "";
+
+
+        document.getElementById(
+          "password"
+        ).value = "";
+
+
+        /*
+          OPTIONAL:
+          Tell Android save succeeded
+        */
+
+        if (
+          window.Android &&
+          typeof window.Android
+            .saveCompleted === "function"
+        ) {
+
+          try {
+
+            window.Android.saveCompleted();
+
+          } catch (error) {
+
+            console.log(error);
+
+          }
+
+        }
+
+
+      } catch (error) {
+
+        console.error(
+          "Supabase save error:",
+          error
+        );
+
+
+        message.style.color =
+          "red";
+
+
+        message.innerText =
+          "Failed to save: " +
+          (error.message ||
+            "Unknown error");
+
+
+      } finally {
+
+        button.disabled =
+          false;
+
+        button.innerText =
+          "Save";
+
+      }
+
+    }
+
+
+    /* =================================
+       PAGE LOAD
+    ================================= */
+
+    window.addEventListener(
+      "load",
+      function() {
+
+        setTimeout(
+          checkAndroidDevice,
+          300
+        );
+
+      }
+    );
+
+  </script>
+
+</body>
+</html>
